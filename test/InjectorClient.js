@@ -7,38 +7,20 @@ describe('InjectorClient', function() {
     var injectorClient, debuggerClient, breakedObject;
 
     function setupInjector(done) {
-      // increase the timeout for Travis CI
-      this.timeout(5000);
-
-      launcher.runPeriodicConsoleLog(false, function(childProcess, client) {
-        debuggerClient = client;
-        injectorClient = new InjectorClient({inject: false}, debuggerClient);
-        debuggerClient.once('break', function(obj) {
-          breakedObject = obj;
-          done();
-        });
-        injectorClient._pause();
+      launcher.runCommandlet(false, function(childProcess, session) {
+        debuggerClient = session.debuggerClient;
+        injectorClient = new InjectorClient({inject: false}, session);
+        done();
       });
     }
 
     before(setupInjector);
 
-    it('ignores break events not created by the injector', function() {
-      var pausedByInjector = injectorClient.containsInjectorMark('wrongInvocationText');
-      expect(pausedByInjector, 'invocation text not equal to PAUSE_CHECK').to.equal(false);
-    });
-
-    it('checks that application paused by injector', function() {
-      var pausedByInjector = injectorClient.containsInjectorMark(breakedObject.invocationText);
-      expect(pausedByInjector, 'invocation text equal to PAUSE_CHECK').to.equal(true);
-    });
-
     it('breaks the injection flow with injected=false', function(done) {
-      injectorClient.once('inject', function(injected) {
-        expect(injected, 'injection command discarded').to.equal(false);
+      injectorClient.inject(function() {
+        expect(injectorClient._injected).to.be.equal(false);
         done();
       });
-      injectorClient.inject();
     });
   });
 
@@ -47,17 +29,10 @@ describe('InjectorClient', function() {
     var injectorClient, debuggerClient, serverPort;
 
     function setupInjector(done) {
-      // increase the timeout for Travis CI
-      this.timeout(5000);
-
-      launcher.runPeriodicConsoleLog(false, function(childProcess, client) {
-        debuggerClient = client;
-        injectorClient = new InjectorClient({}, debuggerClient);
-        injectorClient._pause();
-        debuggerClient.once('break', function(obj) {
-          injectorClient._appPausedByInjector = injectorClient.containsInjectorMark(obj.invocationText);
-          done();
-        });
+      launcher.runCommandlet(false, function(childProcess, session) {
+        debuggerClient = session.debuggerClient;
+        injectorClient = new InjectorClient({}, session);
+        done();
       });
     }
 
@@ -65,27 +40,17 @@ describe('InjectorClient', function() {
       expect(injectorClient.needsInject, 'injection is needed').to.equal(true);
     });
 
-    it('inject server', function(done) {
-      injectorClient.once('inject', function(injected) {
-        expect(injected).to.equal(true);
-        if (injected) done();
-      });
-      injectorClient.once('error', function(error) {
-        done(error);
-      });
-      injectorClient.inject();
+    it('injects server', function(done) {
+      injectorClient.inject(done);
     });
 
     it('does not need to inject if already injected', function() {
       expect(injectorClient.needsInject, 'injection is not needed').to.equal(false);
     });
 
-    it('notify that is already injected', function(done) {
-      injectorClient.once('inject', function(injected) {
-        expect(injected, 'is already injected').to.equal(true);
-        done();
-      });
-      injectorClient.inject();
+    it('should don`t emit `inject` event if is already injected', function(done) {
+      injectorClient.once('inject', done);
+      injectorClient.inject(done);
     });
 
     it('would close on "close" debuggerClient', function(done) {
@@ -107,22 +72,15 @@ describe('InjectorClient', function() {
     var injectorClient, debuggerClient;
 
     function setupInjector(done) {
-      // increase the timeout for Travis CI
-      this.timeout(5000);
-
-      launcher.runPeriodicConsoleLog(true, function(childProcess, client) {
-        debuggerClient = client;
-        injectorClient = new InjectorClient({}, debuggerClient);
+      launcher.runCommandlet(true, function(childProcess, session) {
+        debuggerClient = session.debuggerClient;
+        injectorClient = new InjectorClient({}, session);
         done();
       });
     }
 
     it('connects to server', function(done) {
-      injectorClient.once('inject', function(injected) {
-        expect(injected, 'is injected').to.equal(true);
-        done();
-      });
-      injectorClient.inject();
+      injectorClient.inject(done);
     });
   });
 
@@ -131,19 +89,13 @@ describe('InjectorClient', function() {
     var injectorClient, debuggerClient;
 
     function setupInjector(done) {
-      // increase the timeout for Travis CI
-      this.timeout(5000);
-
-      launcher.runPeriodicConsoleLog(true, function(childProcess, client) {
-        debuggerClient = client;
-        injectorClient = new InjectorClient({}, debuggerClient);
-        injectorClient.once('inject', function(injected) {
-          if (injected) done();
+      launcher.runCommandlet(true, function(childProcess, session) {
+        debuggerClient = session.debuggerClient;
+        injectorClient = new InjectorClient({}, session);
+        injectorClient.inject(function(error) {
+          if (error) return done(error);
+          debuggerClient.request('continue', null, done);
         });
-        injectorClient.once('error', function(error) {
-          done(error);
-        });
-        injectorClient.inject();
       });
     }
 
@@ -162,7 +114,7 @@ describe('InjectorClient', function() {
               message: options.message + message
             });
 
-            return fn.apply(console, arguments);
+            return fn && fn.apply(console, arguments);
           };
         })(console.log);
 
@@ -191,19 +143,13 @@ describe('InjectorClient', function() {
     var injectorClient, debuggerClient;
 
     function setupInjector(done) {
-      // increase the timeout for Travis CI
-      this.timeout(5000);
-
-      launcher.runPeriodicConsoleLog(true, function(childProcess, client) {
-        debuggerClient = client;
-        injectorClient = new InjectorClient({}, debuggerClient);
-        injectorClient.once('inject', function(injected) {
-          if (injected) done();
+      launcher.runCommandlet(true, function(childProcess, session) {
+        debuggerClient = session.debuggerClient;
+        injectorClient = new InjectorClient({}, session);
+        injectorClient.inject(function(error) {
+          if (error) return done(error);
+          debuggerClient.request('continue', null, done);
         });
-        injectorClient.once('error', function(error) {
-          done(error);
-        });
-        injectorClient.inject();
       });
     }
 

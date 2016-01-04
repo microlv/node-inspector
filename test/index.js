@@ -4,7 +4,7 @@ var util = require('util'),
 var index = require('../index');
 
 describe('index', function() {
-  describe('build_url', function() {
+  describe('buildInspectorUrl', function() {
     it('should build an http URL', function() {
       var url = index.buildInspectorUrl(
         'example.com',
@@ -13,7 +13,7 @@ describe('index', function() {
         null,
         false
       );
-      expect(url).to.equal('http://example.com:2223/debug?port=7863');
+      expect(url).to.equal('http://example.com:2223/?ws=example.com:2223&port=7863');
     });
 
     it('should build an http URL', function() {
@@ -24,7 +24,32 @@ describe('index', function() {
         null,
         true
       );
-      expect(url).to.equal('https://example.com:2223/debug?port=7863');
+      expect(url).to.equal('https://example.com:2223/?ws=example.com:2223&port=7863');
     });
   });
+
+  describe('buildWebSocketUrl', function() {
+    it('should build an ws URL', function() {
+      var url = index.buildWebSocketUrl(
+        'example.com',
+        '2223',
+        '7863',
+        null,
+        false
+      );
+      expect(url).to.equal('ws://example.com:2223/?port=7863');
+    });
+
+    it('should build an wss URL', function() {
+      var url = index.buildWebSocketUrl(
+        'example.com',
+        '2223',
+        '7863',
+        null,
+        true
+      );
+      expect(url).to.equal('wss://example.com:2223/?port=7863');
+    });
+  });
+
 });

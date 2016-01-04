@@ -1,81 +1,111 @@
 var expect = require('chai').expect,
+  semver = require('semver'),
   launcher = require('./helpers/launcher.js'),
   CallFramesProvider = require('../lib/CallFramesProvider').CallFramesProvider;
 
 describe('CallFramesProvider', function() {
-  launcher.stopAllDebuggersAfterEachTest();
+  var scriptId,
+      session,
+      callFrames;
+
+  beforeEach(function(done) {
+    launcher.runOnBreakInFunction(function(_session) {
+      session = _session;
+
+      session.debuggerClient.request('scripts', {
+        filter: 'BreakInFunction.js',
+      }, function(error, result) {
+        scriptId = '' + result[0].id;
+        var provider = new CallFramesProvider({}, session);
+        provider.fetchCallFrames(function(error, _callFrames) {
+          if (error !== undefined && error !== null) {
+            done(error);
+            return;
+          }
+
+          callFrames = _callFrames;
+          done();
+        });
+      });
+    });
+  });
 
   it('gets stack trace', function(done) {
-    launcher.runOnBreakInFunction(function(debuggerClient) {
-      var provider = new CallFramesProvider({}, debuggerClient);
-      provider.fetchCallFrames(function(error, callFrames) {
-        if (error !== undefined && error !== null) {
-          done(error);
-          return;
-        }
+    var provider = new CallFramesProvider({}, session);
+    provider.fetchCallFrames(function(error, callFrames) {
+      if (error !== undefined && error !== null) {
+        done(error);
+        return;
+      }
 
-        // The order of script loading has changed in v0.11
-        var scriptId = /^v0\.10\./.test(process.version) ? '28' : '36';
+      expect(callFrames).to.have.length.least(2);
 
-        expect(callFrames).to.have.length.least(2);
+      assertFrame({
+          callFrameId: '0',
+          functionName: 'MyObj.myFunc',
+          location: {scriptId: scriptId, lineNumber: 8, columnNumber: 4},
+          scopeChain: scopeWithIndex(0),
+          'this': objectValueWithId('1')
+        },
+        callFrames[0],
+        'frame[0]');
 
-        function objectValueWithId(id, className) {
-          return {
-            type: 'object',
-            objectId: id,
-            className: className || 'Object',
-            description: className || 'Object'
-          };
-        }
+      assertFrame({
+          callFrameId: '1',
+          functionName: 'globalFunc',
+          location: {scriptId: scriptId, lineNumber: 13, columnNumber: 6},
+          scopeChain: scopeWithIndex(1),
+          'this': objectValueWithId('10', 'global')
+        },
+        callFrames[1],
+        'frame[1]');
 
-        assertFrame({
-            callFrameId: '0',
-            functionName: 'MyObj.myFunc',
-            location: {scriptId: scriptId, lineNumber: 8, columnNumber: 4},
-            scopeChain: [
-              { object: objectValueWithId('scope:0:0'), type: 'local' },
-              { object: objectValueWithId('scope:0:1'), type: 'closure' },
-              { object: objectValueWithId('scope:0:2'), type: 'global' }
-            ],
-            'this': objectValueWithId('1')
-          },
-          callFrames[0],
-          'frame[0]');
-
-        assertFrame({
-            callFrameId: '1',
-            functionName: 'globalFunc',
-            location: {scriptId: scriptId, lineNumber: 13, columnNumber: 6},
-            scopeChain: [
-              { object: objectValueWithId('scope:1:0'), type: 'local' },
-              { object: objectValueWithId('scope:1:1'), type: 'closure' },
-              { object: objectValueWithId('scope:1:2'), type: 'global' }
-            ],
-            'this': objectValueWithId('10', 'global')
-          },
-          callFrames[1],
-          'frame[1]');
-
-        done();
-      });
+      done();
     });
   });
 
   it('retrieves specified number of stack traces when configured', function(done) {
-    launcher.runOnBreakInFunction(function(debuggerClient) {
-      var provider = new CallFramesProvider({stackTraceLimit: 1}, debuggerClient);
-      provider.fetchCallFrames(function(error, callFrames) {
-        if (error !== undefined && error !== null) {
-          done(error);
-          return;
-        }
+    var provider = new CallFramesProvider({stackTraceLimit: 1}, session);
+    provider.fetchCallFrames(function(error, callFrames) {
+      if (error !== undefined && error !== null) {
+        done(error);
+        return;
+      }
 
-        expect(callFrames).to.have.length(1);
-        done();
-      });
+      expect(callFrames).to.have.length(1);
+      done();
     });
   });
 });
+
+function objectValueWithId(id, className) {
+  return {
+    type: 'object',
+    objectId: id,
+    className: className || 'Object',
+    description: className || 'Object'
+  };
+}
+
+function scopeWithIndex(index) {
+  var scopeChain;
+
+  if (semver.lt(process.version, '1.0.0'))
+    scopeChain = [
+      { object: objectValueWithId('scope:' + index + ':0'), type: 'local' },
+      { object: objectValueWithId('scope:' + index + ':1'), type: 'closure' },
+      { object: objectValueWithId('scope:' + index + ':2'), type: 'global' }
+    ];
+  else
+    scopeChain = [
+      { object: objectValueWithId('scope:' + index + ':0'), type: 'local' },
+      { object: objectValueWithId('scope:' + index + ':1'), type: 'closure' },
+      { object: objectValueWithId('scope:' + index + ':2'), type: 'unknown' },
+      { object: objectValueWithId('scope:' + index + ':3'), type: 'global' }
+    ];
+
+  return scopeChain;
+}
 
 function assertFrame(expected, actual, frameName) {
   expect(actual.callFrameId, frameName + '.callFrameId')
@@ -100,4 +130,3 @@ function assertJSONEqual(expected, actual, message) {
   var actualString = actual ? JSON.stringify(actual) : actual;
   expect(actualString, message).to.equal(expectedString);
 }
-

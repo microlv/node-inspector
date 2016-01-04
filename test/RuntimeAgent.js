@@ -1,11 +1,11 @@
 var expect = require('chai').expect,
   launcher = require('./helpers/launcher.js'),
   CallFramesProvider = require('../lib/CallFramesProvider').CallFramesProvider,
-  RuntimeAgent = require('../lib/RuntimeAgent.js').RuntimeAgent;
+  RuntimeAgent = require('../lib/RuntimeAgent.js').RuntimeAgent,
+  ConsoleClient = require('../lib/ConsoleClient').ConsoleClient,
+  HeapProfilerClient = require('../lib/HeapProfilerClient').HeapProfilerClient;
 
 describe('RuntimeAgent', function() {
-  after(launcher.stopAllDebuggers);
-
   it('gets scope properties', function(done) {
     // Hard-coded value for local scope of MyObj.myFunc().
     // See CallFramesProvider 'gets stack trace'
@@ -13,7 +13,7 @@ describe('RuntimeAgent', function() {
 
     launcher.runOnBreakInFunction(function(debuggerClient) {
       var callFramesProvider = new CallFramesProvider({}, debuggerClient),
-        agent = new RuntimeAgent({}, debuggerClient);
+        agent = setupRuntimeAgent(debuggerClient);
 
       // request call frames so that scope properties are initialized
       callFramesProvider.fetchCallFrames(function(cferror) {
@@ -72,8 +72,8 @@ describe('RuntimeAgent', function() {
 
   it('filter null __proto__', function(done) {
     /*'Object' objectId is 3. __proto__ of 'Object' is 'null'*/
-    launcher.runInspectObject(function(debuggerClient, inspectedObjectId) {
-      var agent = new RuntimeAgent({}, debuggerClient);
+    launcher.runInspectObject(function(session, inspectedObjectId) {
+      var agent = setupRuntimeAgent(session);
       agent.getProperties(
         {
           objectId: 3,
@@ -97,8 +97,8 @@ describe('RuntimeAgent', function() {
   });
 
   it('returns object properties with metadata', function(done) {
-    launcher.runInspectObject(function(debuggerClient, inspectedObjectId) {
-      var agent = new RuntimeAgent({}, debuggerClient);
+    launcher.runInspectObject(function(session, inspectedObjectId) {
+      var agent = setupRuntimeAgent(session);
       agent.getProperties(
         {
           objectId: inspectedObjectId,
@@ -136,8 +136,8 @@ describe('RuntimeAgent', function() {
   });
 
   it('returns empty result for accessorPropertiesOnly:true', function(done) {
-    launcher.runInspectObject(function(debuggerClient, inspectedObjectId) {
-      var agent = new RuntimeAgent({}, debuggerClient);
+    launcher.runInspectObject(function(session, inspectedObjectId) {
+      var agent = setupRuntimeAgent(session);
       agent.getProperties(
         {
           objectId: inspectedObjectId,
@@ -155,8 +155,8 @@ describe('RuntimeAgent', function() {
   });
 
   it('returns __proto__ for ownProperties:true', function(done) {
-    launcher.runInspectObject(function(debuggerClient, inspectedObjectId) {
-      var agent = new RuntimeAgent({}, debuggerClient);
+    launcher.runInspectObject(function(session, inspectedObjectId) {
+      var agent = setupRuntimeAgent(session);
       agent.getProperties(
         {
           objectId: inspectedObjectId,
@@ -192,8 +192,9 @@ describe('RuntimeAgent', function() {
   });
 
   it('calls function on an object to get completions', function(done) {
-    launcher.runOnBreakInFunction(function(debuggerClient) {
-      var agent = new RuntimeAgent({}, debuggerClient);
+    launcher.runOnBreakInFunction(function(session) {
+      var debuggerClient = session.debuggerClient;
+      var agent = setupRuntimeAgent(session);
 
       debuggerClient.fetchObjectId(agent, 'console', function(consoleObjectId) {
         agent.callFunctionOn(
@@ -271,10 +272,10 @@ describe('RuntimeAgent', function() {
     var debuggerClient, inspectedObjectId, agent;
 
     function setupDebugScenario(done) {
-      launcher.runInspectObject(function(client, objectId) {
-        debuggerClient = client;
+      launcher.runInspectObject(function(session, objectId) {
+        debuggerClient = session.debuggerClient;
         inspectedObjectId = objectId;
-        agent = new RuntimeAgent({}, debuggerClient);
+        agent = setupRuntimeAgent(session);
         done();
       });
     }
@@ -337,6 +338,12 @@ describe('RuntimeAgent', function() {
     }
   });
 });
+
+function setupRuntimeAgent(session) {
+  session.consoleClient = new ConsoleClient({}, session);
+  session.heapProfilerClient = new HeapProfilerClient({}, session);
+  return new RuntimeAgent({}, session);
+}
 
 function convertPropertyArrayToLookup(array) {
   var lookup = {};

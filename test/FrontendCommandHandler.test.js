@@ -9,25 +9,29 @@ var InjectorClient = require('../lib/InjectorClient.js').InjectorClient;
 var WebSocketMock = require('./helpers/wsmock');
 
 describe('FrontendCommandHandler', function() {
-  after(launcher.stopAllDebuggers);
+  before(setupProcess);
+
+  var session;
+
+  function setupProcess(done) {
+    launcher.startDebugger(
+      'BreakInFunction.js',
+      function(childProcess, _session) {
+        session = _session;
+        done();
+      });
+  }
 
   it('defers "scriptParsed" events until "Page.getResourceTree"', function(done) {
+    this.timeout(5000);
+
     var TREE_REQID = 10;
 
     async.waterfall([
-      function startDebugger(cb) {
-        var scriptToDebug = 'BreakInFunction.js'; // any script will work
-        launcher.startDebugger(
-          scriptToDebug,
-          function(childProcess, debuggerClient) {
-            cb(null, debuggerClient);
-          });
-      },
-
-      function arrange(debuggerClient, cb) {
+      function arrange(cb) {
         this.wsmock = new WebSocketMock();
 
-        var handler = createFrontendCommandHandler(this.wsmock, debuggerClient);
+        var handler = createFrontendCommandHandler(this.wsmock, session);
         this.handler = handler;
         this.handleCommand = function(req) {
           handler.handleCommand(req);
@@ -67,27 +71,13 @@ describe('FrontendCommandHandler', function() {
     ], done);
   });
 
-  function createFrontendCommandHandler(wsclient, debuggerClient) {
-    var config = {
-      isHidden: function() { return false; }
-    };
+  function createFrontendCommandHandler(wsclient, session) {
+    var config = {inject: false};
+    session.frontendClient = new FrontendClient(wsclient);
+    session.injectorClient = new InjectorClient(config, session);
+    session.scriptManager = new ScriptManager(config, session);
+    session.breakEventHandler = {};
 
-    var injectorClient = new InjectorClient({inject: false}, debuggerClient);
-    var frontendClient = new FrontendClient(wsclient);
-
-    var scriptManager = new ScriptManager(
-      config.isHidden,
-      frontendClient,
-      debuggerClient);
-
-    var breakEventHandlerMock = {};
-
-    return new FrontendCommandHandler(
-      config,
-      frontendClient,
-      debuggerClient,
-      breakEventHandlerMock,
-      scriptManager,
-      injectorClient);
+    return new FrontendCommandHandler(config, session);
   }
 });

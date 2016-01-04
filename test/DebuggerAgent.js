@@ -1,10 +1,9 @@
 var expect = require('chai').expect,
   launcher = require('./helpers/launcher.js'),
+  ScriptManager = require('../lib/ScriptManager.js').ScriptManager,
   DebuggerAgent = require('../lib/DebuggerAgent.js').DebuggerAgent;
 
 describe('DebuggerAgent', function() {
-  after(launcher.stopAllDebuggers);
-
   describe('sets variable value', function() {
     before(setupDebugScenario);
 
@@ -63,9 +62,9 @@ describe('DebuggerAgent', function() {
     var debuggerClient, agent;
 
     function setupDebugScenario(done) {
-      launcher.runOnBreakInFunction(function(client) {
-        debuggerClient = client;
-        agent = new DebuggerAgent({}, null, debuggerClient, null, null);
+      launcher.runOnBreakInFunction(function(session) {
+        debuggerClient = session.debuggerClient;
+        agent = new DebuggerAgent({}, session);
         done();
       });
     }
@@ -212,12 +211,11 @@ describe('DebuggerAgent', function() {
       );
     });
 
-    var debuggerClient, agent;
+    var agent;
 
     function setupDebugScenario(done) {
-      launcher.runOnBreakInFunction(function(client) {
-        debuggerClient = client;
-        agent = new DebuggerAgent({}, null, debuggerClient, null, null);
+      launcher.runOnBreakInFunction(function(session) {
+        agent = new DebuggerAgent({}, session);
         done();
       });
     }
@@ -231,20 +229,34 @@ describe('DebuggerAgent', function() {
         .to.not.throw();
     });
 
-    var debuggerClient, agent;
+    var agent;
 
     function setupDebugScenario(done) {
-      launcher.runOnBreakInFunction(function(client) {
-        debuggerClient = client;
-        var frontEndClientStub = {
-          sendEvent: function() {}
-        };
-        agent = new DebuggerAgent(
-          {},
-          frontEndClientStub,
-          debuggerClient,
-          null,  // BreakEventHandler
-          null); // ScripManager
+      launcher.runOnBreakInFunction(function(session) {
+        agent = new DebuggerAgent({}, session);
+        done();
+      });
+    }
+  });
+
+  describe('setBreakpointByUrl()', function() {
+    before(setupDebugScenario);
+
+    it('does not throw an error', function(done) {
+      expect(function() { agent.setBreakpointByUrl({
+        url: 'folder/app.js',
+        line: 0,
+        column: 0,
+        condition: ''
+      }, done); }).to.not.throw();
+    });
+
+    var agent;
+
+    function setupDebugScenario(done) {
+      launcher.runOnBreakInFunction(function(session) {
+        session.scriptManager = new ScriptManager({}, session);
+        agent = new DebuggerAgent({}, session);
         done();
       });
     }

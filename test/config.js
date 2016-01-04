@@ -42,6 +42,16 @@ describe('Config', function() {
       expect(config.preload).to.equal(false);
     });
 
+    it('handles --inject', function() {
+      var config = givenConfigFromArgs('--no-inject');
+      expect(config.inject).to.equal(false);
+    });
+
+    it('handles --inject.sub', function() {
+      var config = givenConfigFromArgs('--no-inject.sub');
+      expect(config.inject.sub).to.equal(false);
+    });
+
     it('handles --hidden', function() {
       var config = givenConfigFromArgs('--hidden="abc"');
       expect(config.hidden).to.satisfy(util.isArray);
@@ -131,6 +141,14 @@ describe('Config', function() {
       'f': null,
       'g': ['h', 1],
       'j': [],
+      'k': [/abc/gi],
+      'l': {
+        m: true,
+        n: '1',
+        o: {
+          p: false
+        }
+      },
       'camelKeyOption': 'a',
     };
 
@@ -144,6 +162,9 @@ describe('Config', function() {
       expect(serialisedOptions, 'filtered `undefined` value').to.not.contain('-e=undefined');
       expect(serialisedOptions, 'not filtered `null` value').to.contain('-f=null');
       expect(serialisedOptions, 'true serialised array format').to.contain('-g=h -g=1');
+      expect(serialisedOptions, 'true serialised regexp format').to.contain('-k=abc');
+      expect(serialisedOptions, 'true serialised object format')
+        .to.contain('--l.m --l.n=1 --l.o.p=false');
       expect(serialisedOptions, 'filtered empty array').to.not.contain('-j');
       expect(serialisedOptions, 'true serialised camelKey option').to.contain('--camel-key-option=a');
     });

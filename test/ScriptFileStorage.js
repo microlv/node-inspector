@@ -3,6 +3,7 @@ var fs = require('fs-extra'),
   expect = require('chai').expect,
   glob = require('glob'),
   launcher = require('./helpers/launcher.js'),
+  SessionStub = require('./helpers/SessionStub.js'),
   ScriptFileStorage = require('../lib/ScriptFileStorage.js').ScriptFileStorage,
   ScriptManager = require('../lib/ScriptManager.js').ScriptManager;
 
@@ -14,7 +15,6 @@ var NON_APP_DIR = path.join(__dirname, '..', 'front-end', 'cm');
 beforeEach(deleteTemps);
 describe('ScriptFileStorage', function() {
   var storage;
-  launcher.stopAllDebuggersAfterEachTest();
   beforeEach(function() {
     storage = createScriptFileStorage();
   });
@@ -248,9 +248,9 @@ describe('ScriptFileStorage', function() {
     }
 
     var originalScript = createTempFileAsCopyOf('LiveEdit.js', transformSource);
-    launcher.startDebugger(TEMP_FILE, function(childProcess, debuggerClient) {
-      getScriptSourceByName(debuggerClient, TEMP_FILE, function(source) {
-        callback(debuggerClient, originalScript, source);
+    launcher.startDebugger(TEMP_FILE, function(childProcess, session) {
+      getScriptSourceByName(session.debuggerClient, TEMP_FILE, function(source) {
+        callback(session.debuggerClient, originalScript, source);
       });
     });
   }
@@ -281,14 +281,10 @@ describe('ScriptFileStorage', function() {
 });
 
 function createScriptFileStorage(config) {
-  var emptyEventEmitter = {
-    on: function(){}
-  };
-  var storage = new ScriptFileStorage(
-    config,
-    new ScriptManager(config, emptyEventEmitter, emptyEventEmitter)
-  );
-  
+  var session = new SessionStub();
+  session.scriptManager = new ScriptManager(config, session);
+  var storage = new ScriptFileStorage(config, session);
+
   return storage;
 }
 

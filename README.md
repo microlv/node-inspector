@@ -4,6 +4,7 @@
 [![NPM version](https://badge.fury.io/js/node-inspector.png)](http://badge.fury.io/js/node-inspector)
 [![Bountysource](https://www.bountysource.com/badge/tracker?tracker_id=195817)](https://www.bountysource.com/trackers/195817-node-inspector?utm_source=195817&utm_medium=shield&utm_campaign=TRACKER_BADGE)
 
+[![Join the chat at https://gitter.im/node-inspector/node-inspector](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/node-inspector/node-inspector?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Overview
 
@@ -40,6 +41,8 @@ $ node-debug app.js
 
 where ```app.js``` is the name of your main Node application JavaScript file.
 
+See available configuration options [here](https://github.com/node-inspector/node-inspector#configuration)
+
 #### Debug
 
 The `node-debug` command will load Node Inspector in your default browser.
@@ -55,7 +58,7 @@ to get started.
 
 Other useful resources:
  - Documentation specific to Node Inspector provided by StrongLoop:
-  [Debugging with Node Inspector](http://docs.strongloop.com/display/SLC/Debugging+with+Node+Inspector)
+  [Debugging with Node Inspector](http://docs.strongloop.com/display/SLC/Debugging+applications)
  - Miroslav's talk
   [How to Debug Node Apps with Node Inspector](https://vimeo.com/77870960)
  - Danny's [screencasts](http://www.youtube.com/view_play_list?p=A5216AC29A41EFA8)
@@ -78,6 +81,9 @@ Node Inspector supports almost all of the debugging features of DevTools, includ
 * Continue to location
 * Break on exceptions
 * Disable/enable all breakpoints
+* CPU and HEAP profiling
+* Network client requests inspection
+* Console output inspection
 
 ### Cool stuff
 * Node Inspector uses WebSockets, so no polling for breaks.
@@ -86,21 +92,20 @@ Node Inspector supports almost all of the debugging features of DevTools, includ
   optionally persisting changes back to the file-system.
 * Set breakpoints in files that are not loaded into V8 yet - useful for
   debugging module loading/initialization.
-* Javascript from top to bottom :)
 * Embeddable in other applications - see [Embedding HOWTO](docs/embedding.md)
   for more details.
 
 ## Known Issues
 
+* If there are symlink cycles then the [glob](https://github.com/isaacs/node-glob)
+  module may take a long time to return results causing long delays at startup.
+  The workaround is to disable preloading of scripts with `--no-preload`.
 * Be careful about viewing the contents of Buffer objects,
   each byte is displayed as an individual array element;
   for most Buffers this will take too long to render.
 * While not stopped at a breakpoint the console doesn't always
   behave as you might expect. See the
   [issue #146](https://github.com/node-inspector/node-inspector/issues/146).
-* Profiler is not implemented yet. Have a look at
-  [node-webkit-agent](https://github.com/c4milo/node-webkit-agent)
-  in the meantime.
 * Break on uncaught exceptions does not work in all Node versions,
   you need at least v0.11.3 (see
   [node#5713](https://github.com/joyent/node/pull/5713)).
@@ -165,6 +170,7 @@ When you are done cleaning up, hit refresh in the browser.
 #### Node Inspector takes a long time to start up.
 
 Try setting --no-preload to true. This option disables searching disk for *.js at startup.
+Code will still be loaded into Node Inspector at runtime, as modules are required.
 
 #### How do I debug Mocha unit-tests?
 
@@ -189,7 +195,7 @@ If you are running on Windows, you have to get the full path of `gulp.js`
 to make an equivalent command:
 
 ```sh
-> node-debug "C:\Users\user\AppData\Roaming\npm\node_modules\gulp\bin\gulp.js" task
+> node-debug %appdata%\npm\node_modules\gulp\bin\gulp.js task
 ```
 *You can omit the `task` part to run the `default` task.*
 
@@ -263,16 +269,16 @@ an undocumented API function `process._debugProcess(pid)`:
 
 #### 3. Load the debugger UI
 
-Open http://127.0.0.1:8080/debug?port=5858 in the Chrome browser.
+Open http://127.0.0.1:8080/?port=5858 in the Chrome browser.
 
 ## Configuration
 
-Both `node-inspector` and `node-debug` use [rc](https://npmjs.org/package/rc) module 
+Both `node-inspector` and `node-debug` use [rc](https://npmjs.org/package/rc) module
 to manage configuration options.
 
 Places for configuration:
 * command line arguments (parsed by [yargs](https://github.com/chevex/yargs))
-* enviroment variables prefixed with ```node-inspector_```
+* environment variables prefixed with ```node-inspector_```
 * if you passed an option ```--config file``` then from that file
 * a local ```.node-inspectorrc``` or the first found looking in ```./ ../ ../../
  ../../../``` etc.
@@ -291,7 +297,7 @@ so that sources earlier in this list override later ones.
 | Option | Alias | Default | Description |
 | :------------------ | :-: | :-----: | :-------- |
 | **general**
-| --help              | -h  |         | Display information about avaible options.<br/>Use `--help -l` to display full usage info.<br/>Use `--help <option>` to display quick help on `option`.
+| --help              | -h  |         | Display information about available options.<br/>Use `--help -l` to display full usage info.<br/>Use `--help <option>` to display quick help on `option`.
 | --version           | -v  |         | Display Node Inspector's version.
 | --debug-port        | -d  | 5858    | Node/V8 debugger port.<br/>(`node --debug={port}`)
 | --web-host          |     | 0.0.0.0 | Host to listen on for Node Inspector's web interface.<br/>`node-debug` listens on `127.0.0.1` by default.
@@ -304,7 +310,7 @@ so that sources earlier in this list override later ones.
 | **node-inspector**
 | --save-live-edit    |     | false   | Save live edit changes to disk (update the edited files).
 | --preload           |     | true    | Preload *.js files. You can disable this option<br/>to speed up the startup.
-| --inject            |     | true    | Enable injection of debugger extensions into the debugged process.
+| --inject            |     | true    | Enable injection of debugger extensions into the debugged process. It's possible disable only part of injections using subkeys `--no-inject.network`. Allowed keys : `network`, `profiles`, `console`.
 | --hidden            |     | []      | Array of files to hide from the UI,<br/>breakpoints in these files will be ignored.<br/>All paths are interpreted as regular expressions.
 | --stack-trace-limit |     | 50      | Number of stack frames to show on a breakpoint.
 | --ssl-key           |     |         | Path to file containing a valid SSL key.
@@ -334,7 +340,7 @@ $ node-debug -p 5859 app
 Pass `--web-host=127.0.0.2` to node-inspector. Start node-inspector to listen on `127.0.0.2`:
 ```
 $ node-debug --web-host 127.0.0.2 app
-``` 
+```
 Pass `--option=value` to debugging process:
 ```
 $ node-debug app --option value
